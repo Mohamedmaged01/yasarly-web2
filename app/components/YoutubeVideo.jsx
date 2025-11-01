@@ -141,6 +141,12 @@ const YoutubeVideo = ({ videoId, onPause, playerRef, watermarkText }) => {
               </Button>
               <Button
                 className={`${buttonVariant} p-2 rounded`}
+                onClick={() => handlePlaybackRateChange(1.75)}
+              >
+                1.75x
+              </Button>
+              <Button
+                className={`${buttonVariant} p-2 rounded`}
                 onClick={() => handlePlaybackRateChange(2)}
               >
                 2x
@@ -191,6 +197,12 @@ const YoutubeVideo = ({ videoId, onPause, playerRef, watermarkText }) => {
                 onClick={() => handlePlaybackRateChange(1.5)}
               >
                 1.5x
+              </Button>
+              <Button
+                className={`${buttonVariant} p-2 rounded`}
+                onClick={() => handlePlaybackRateChange(1.75)}
+              >
+                1.75x
               </Button>
               <Button
                 className={`${buttonVariant} p-2 rounded`}

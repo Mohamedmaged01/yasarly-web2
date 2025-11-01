@@ -32,58 +32,39 @@ const MyCourseView = () => {
   const [comment, setComment] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [studentCommentId, setStudentCommentId] = useState(null);
+  const [studentId, setStudentId] = useState(null);
+  const [selectedLecture, setSelectedLecture] = useState(null);
 
   const router = useRouter();
 
-  // useEffect(() => {
-  //   // Function to detect screen recording
-  //   async function detectScreenRecording() {
-  //     try {
-  //       // Request permission to capture the screen
-  //       const stream = await navigator.mediaDevices.getDisplayMedia({
-  //         video: true,
-  //       });
-
-  //       if (stream) {
-  //         // If screen recording starts, redirect the user to login
-  //         router.push('/login');
-  //       }
-  //     } catch (error) {
-  //       console.error("Screen recording permission denied or error occurred", error);
-  //     }
-  //   }
-
-  //   // Call the screen recording detection function
-  //   detectScreenRecording();
-  // }, [router]);
-
-  // useEffect(() => {
-  //   const handleVisibilityChange = () => {
-  //     if (document.visibilityState === 'hidden') {
-  //       // عند تغير حالة النافذة إلى "مخفية" نقوم بتوجيه المستخدم إلى صفحة تسجيل الدخول
-  //       router.push('/login');
-  //     }
-  //   };
-
-  //   // إضافة مستمع لحالة الرؤية
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-
-  //   // إزالة المستمع عند الخروج من الصفحة لتجنب الذاكرة المتسربة
-  //   return () => {
-  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
-  //   };
-  // }, [router]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setStudentId(localStorage.getItem("studentId"));
+    }
+  }, []);
 
   const fetchData = async () => {
     try {
       const courseData = await getCourseById(idd.id);
       setCourseInfo(courseData);
       setSelectedLectureUrl(courseData.courseVideoIntro);
+      // Cache course data in localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`cachedCourse_${idd.id}`, JSON.stringify(courseData));
+      }
     } catch (error) {
+      // If backend fails, try to load from cache
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(`cachedCourse_${idd.id}`);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          setCourseInfo(cachedData);
+          setSelectedLectureUrl(cachedData.courseVideoIntro);
+        }
+      }
       console.log(error);
     }
   };
-  const studentId = localStorage.getItem("studentId");
 
   const fetchStudent = async () => {
     try {
@@ -106,10 +87,12 @@ const MyCourseView = () => {
   };
 
   useEffect(() => {
-    fetchData();
-    fetchStudent();
-    fetchComment();
-  }, [idd.id]);
+    if (studentId) {
+      fetchData();
+      fetchStudent();
+      fetchComment();
+    }
+  }, [idd.id, studentId]);
 
   const handleCommentChange = (event) => {
     setNewComment(event.target.value); // Update the newComment state
@@ -139,28 +122,6 @@ const MyCourseView = () => {
     // You can customize additional options here if needed
   };
 
-  // const [isRecording, setIsRecording] = useState(false);
-
-  // useEffect(() => {
-  //   const handleFocus = () => {
-  //     setIsRecording(false); // Remove the black overlay when the window is in focus
-  //   };
-
-  //   const handleBlur = () => {
-  //     setIsRecording(true); // Apply the black overlay when the window loses focus
-  //   };
-
-  //   // Attach event listeners for focus and blur
-  //   window.addEventListener('focus', handleFocus);
-  //   window.addEventListener('blur', handleBlur);
-
-  //   // Clean up event listeners on unmount
-  //   return () => {
-  //     window.removeEventListener('focus', handleFocus);
-  //     window.removeEventListener('blur', handleBlur);
-  //   };
-  // }, []);
-
   const extractVideoId = (url) => {
     const videoIdMatch = url?.match(
       /(?:https?:\/\/)?(?:www\.)?youtu(?:be\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|embed)\/|\S*?[?&]v=)|\.be\/)([a-zA-Z0-9_-]{11})/
@@ -173,7 +134,10 @@ const MyCourseView = () => {
   const playerRef = useRef(null);
   const [isScreenBlack, setIsScreenBlack] = useState(false);
   const handlePause = () => {
-    if (playerRef.current) {
+    if (
+      playerRef.current &&
+      typeof playerRef.current.pauseVideo === "function"
+    ) {
       playerRef.current.pauseVideo();
     }
   };
@@ -227,23 +191,47 @@ const MyCourseView = () => {
             height: "400px !important",
           }}
         >
-          {/* <ReactPlayer
-              url={selectedLectureUrl}
-              controls
-
-              width='100%'
-              height="100%"
-            /> */}
-
-          {videoId ? (
-            <YoutupeVideo
-              videoId={videoId}
-              onPause={handlePause}
-              playerRef={playerRef}
-              watermarkText={studentData?.studentName}
-            />
+          {selectedLecture ? (
+            selectedLecture.lectureTypeName === "Video" ? (
+              <YoutupeVideo
+                videoId={extractVideoId(selectedLecture.lectureLink)}
+                onPause={handlePause}
+                playerRef={playerRef}
+                watermarkText={studentData?.studentName}
+              />
+            ) : selectedLecture.lectureTypeName === "File" ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                {/* Image preview if file is an image */}
+                {/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(
+                  selectedLecture.lectureLink
+                ) && (
+                  <img
+                    src={
+                      selectedLecture.lectureLink.startsWith("http")
+                        ? selectedLecture.lectureLink
+                        : `https://yassrly-001-site1.ftempurl.com${selectedLecture.lectureLink.replace("//", "/")}`
+                    }
+                    alt={selectedLecture.lectureName}
+                    className="max-w-[400px] max-h-[400px] mb-4 border rounded shadow"
+                  />
+                )}
+                <a
+                  href={
+                    selectedLecture.lectureLink.startsWith("http")
+                      ? selectedLecture.lectureLink
+                      : `https://yassrly-001-site1.ftempurl.com${selectedLecture.lectureLink.replace("//", "/")}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline text-lg mt-2"
+                  download
+                >
+                  Download or View File
+                </a>
+              </div>
+            ) : null
           ) : (
-            <p>No video found</p>
+            <p>No video or file selected</p>
           )}
         </Box>
         <Box></Box>
@@ -437,7 +425,7 @@ const MyCourseView = () => {
                   >
                     <div
                       className="flex  gap-5"
-                      onClick={() => setSelectedLectureUrl(lec.lectureLink)} // Update lecture URL on click
+                      onClick={() => setSelectedLecture(lec)}
                       style={{ cursor: "pointer" }}
                     >
                       <Box
